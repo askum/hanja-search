@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>한자 사전 - 필기 & 한글 검색</title>
+  
+  <!-- PWA & iOS Meta Tags -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="한자사전">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <h1>한자 사전 <span style="font-weight: 300; font-size: 0.95rem; opacity: 0.9;">漢字辭典</span></h1>
+  </header>
+
+  <!-- Tab Bar -->
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-tab="handwriting">✍️ 필기 검색</button>
+    <button class="tab-btn" data-tab="search">🔍 한글 검색</button>
+    <button class="tab-btn" data-tab="favorites">⭐ 즐겨찾기</button>
+  </nav>
+
+  <!-- Main Content -->
+  <main>
+    <!-- Tab 1: Handwriting Recognition -->
+    <section id="tab-handwriting" class="tab-content active">
+      <!-- iOS Install Guide Banner -->
+      <div id="installBanner" class="install-banner hidden">
+        <div class="install-banner-text">
+          💡 <strong>홈 화면에 추가</strong>하면 인터넷 없이 실제 앱처럼 쓸 수 있습니다! (하단 공유 <strong>⎋</strong> → '홈 화면에 추가')
+        </div>
+        <button id="closeInstallBanner" class="install-banner-close" aria-label="닫기">✕</button>
+      </div>
+
+      <div class="canvas-container">
+        <div class="canvas-wrapper">
+          <div class="canvas-guide"></div>
+          <div id="canvasPlaceholder" class="canvas-placeholder">
+            이곳에 손가락으로<br>한자를 써보세요
+          </div>
+          <canvas id="hwCanvas" width="300" height="300"></canvas>
+        </div>
+
+        <div class="canvas-actions">
+          <button id="btnUndo" class="btn btn-undo">↩️ 획 취소</button>
+          <button id="btnClear" class="btn btn-clear">🗑️ 전체 지우기</button>
+        </div>
+      </div>
+
+      <!-- Handwriting Recognition Results -->
+      <div class="hw-results">
+        <div class="hw-results-title" id="hwStatus">인식 후보 (터치하여 상세 보기)</div>
+        <div id="hwCandidates" class="hw-candidates">
+          <!-- Filled dynamically -->
+          <div style="color: var(--text-secondary); font-size: 0.9rem; padding: 12px 0;">
+            한자를 쓰면 유사한 한자 후보가 여기에 표시됩니다.
+          </div>
+        </div>
+
+        <!-- Detail Card for selected character -->
+        <div id="hwDetailCard" class="detail-card" style="display: none;">
+          <div id="detailHanja" class="detail-hanja">學</div>
+          <div id="detailHunEum" class="detail-hun-eum">배울 학</div>
+          <div id="detailDefinition" class="detail-definition">learning, knowledge; school</div>
+          <div class="detail-meta">
+            <div class="detail-meta-item">
+              <span id="detailStrokes" class="detail-meta-value">16</span>
+              총 획수
+            </div>
+            <div class="detail-meta-item">
+              <span id="detailUnicode" class="detail-meta-value">U+5B78</span>
+              유니코드
+            </div>
+          </div>
+          <div class="detail-actions">
+            <button id="btnPronounce" class="action-btn">🔊 발음 듣기</button>
+            <button id="btnCopy" class="action-btn">📋 한자 복사</button>
+            <button id="btnToggleFav" class="action-btn">⭐ 즐겨찾기</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 2: Hangul & Word Search -->
+    <section id="tab-search" class="tab-content">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="한글 음(학), 훈(배울), 한자(學) 입력..." autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="search-hint" id="searchCountHint">
+        예: '학' (음으로 찾기), '배울' (뜻으로 찾기), '학교' (단어)
+      </div>
+
+      <div id="searchLoading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <span>한자 사전 불러오는 중...</span>
+      </div>
+
+      <ul id="searchResults" class="results-list">
+        <!-- Results populated dynamically -->
+      </ul>
+    </section>
+
+    <!-- Tab 3: Favorites & History -->
+    <section id="tab-favorites" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="font-size: 1rem; color: var(--text-secondary);">저장한 한자 (<span id="favCount">0</span>)</h2>
+        <button id="btnClearFavs" class="action-btn" style="padding: 4px 10px; font-size: 0.75rem;">모두 삭제</button>
+      </div>
+      <ul id="favResults" class="results-list">
+        <!-- Favorites populated dynamically -->
+      </ul>
+    </section>
+  </main>
+
+  <!-- Modal Detail Dialog (for search / favorites click) -->
+  <dialog id="charModal" style="border: none; border-radius: var(--radius); padding: 0; background: transparent; max-width: 90vw; width: 360px; margin: auto; box-shadow: var(--shadow-lg);">
+    <div class="detail-card" style="margin: 0;">
+      <button id="closeModal" style="float: right; border: none; background: none; font-size: 1.2rem; cursor: pointer; color: var(--text-secondary); padding: 4px;">✕</button>
+      <div id="modalHanja" class="detail-hanja">學</div>
+      <div id="modalHunEum" class="detail-hun-eum">배울 학</div>
+      <div id="modalDefinition" class="detail-definition">learning, knowledge; school</div>
+      <div class="detail-meta">
+        <div class="detail-meta-item">
+          <span id="modalStrokes" class="detail-meta-value">16</span>
+          총 획수
+        </div>
+        <div class="detail-meta-item">
+          <span id="modalUnicode" class="detail-meta-value">U+5B78</span>
+          유니코드
+        </div>
+      </div>
+      <div class="detail-actions">
+        <button id="modalBtnPronounce" class="action-btn">🔊 발음 듣기</button>
+        <button id="modalBtnCopy" class="action-btn">📋 한자 복사</button>
+        <button id="modalBtnFav" class="action-btn">⭐ 즐겨찾기</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">알림</div>
+
+  <!-- Scripts -->
+  <script src="./lib/hanzilookup.min.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
