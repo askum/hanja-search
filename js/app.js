@@ -100,9 +100,9 @@
 
     // Register Service Worker with version query
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=2.1')
+      navigator.serviceWorker.register('./sw.js?v=2.2')
         .then(reg => {
-          console.log('[PWA] Service Worker v2.1 registered.');
+          console.log('[PWA] Service Worker v2.2 registered.');
           reg.onupdatefound = () => {
             const installing = reg.installing;
             if (installing) {

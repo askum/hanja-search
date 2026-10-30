@@ -1,10 +1,10 @@
-const CACHE_NAME = 'hanja-dict-v2.1';
+const CACHE_NAME = 'hanja-dict-v2.2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=2.1',
-  './js/app.js?v=2.1',
+  './css/style.css?v=2.2',
+  './js/app.js?v=2.2',
   './lib/hanzilookup.min.js',
   './data/hanja_dict.json',
   './data/mmah.json',

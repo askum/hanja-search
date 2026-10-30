@@ -3,24 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>한자 사전 - 필기 & 한글 검색</title>
+  <title>시아한자사전 - 준5급 시험합격</title>
   
   <!-- PWA & iOS Meta Tags -->
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#2563eb">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="한자사전">
+  <meta name="apple-mobile-web-app-title" content="시아한자사전">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="./css/style.css?v=2.1">
+  <link rel="stylesheet" href="./css/style.css?v=2.2">
 </head>
 <body>
   <!-- Header -->
   <header class="app-header">
-    <h1>한자 사전 <span class="app-version-badge">v2.1 AI</span></h1>
+    <div class="header-left">
+      <h1>시아한자사전 <span class="app-version-badge">v2.2 AI</span></h1>
+      <span class="header-cheer">🎯 준5급 시험합격!</span>
+    </div>
     <button id="btnForceUpdate" class="header-refresh-btn" title="최신 버전으로 새로고침">🔄</button>
   </header>
 
@@ -41,6 +44,11 @@
   <main>
     <!-- Tab 1: Handwriting Recognition -->
     <section id="tab-handwriting" class="tab-content active">
+      <!-- Exam Cheer Banner -->
+      <div class="cheer-banner">
+        <span>🌸 시아의 <strong>준5급 시험합격</strong>을 응원합니다! ✨</span>
+      </div>
+
       <!-- iOS Install Guide Banner -->
       <div id="installBanner" class="install-banner hidden">
         <div class="install-banner-text">
@@ -163,6 +171,6 @@
 
   <!-- Scripts -->
   <script src="./lib/hanzilookup.min.js"></script>
-  <script src="./js/app.js?v=2.1"></script>
+  <script src="./js/app.js?v=2.2"></script>
 </body>
 </html>

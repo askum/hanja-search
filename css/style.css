@@ -45,13 +45,50 @@ body {
   padding-top: env(safe-area-inset-top, 10px);
 }
 
-.app-header h1 {
+.header-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.header-left h1 {
   font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.5px;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.header-cheer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fef08a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.2px;
+}
+
+.cheer-banner {
+  background: linear-gradient(135deg, #eff6ff, #fef9c3);
+  border: 1px solid #fef08a;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: #854d0e;
+  font-weight: 700;
+  box-shadow: var(--shadow);
+  text-align: center;
 }
 
 .app-version-badge {

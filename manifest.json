@@ -1,7 +1,7 @@
 {
-  "name": "한자 사전 - 필기 & 한글 검색",
-  "short_name": "한자사전",
-  "description": "한글 음훈 검색 및 필기 인식을 지원하는 오프라인 한자 사전",
+  "name": "시아한자사전 - 준5급 시험합격",
+  "short_name": "시아한자사전",
+  "description": "한글 음훈 검색 및 필기 인식을 지원하는 오프라인 한자 사전 (준5급 시험합격)",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f8fafc",
