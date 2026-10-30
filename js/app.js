@@ -16,10 +16,12 @@
 
   let isModelLoaded = false;
   let matcher = null;
+  let origMatcher = null;
 
-  let strokes = [];            // [[[x, y], ...], ...]
+  let strokes = [];            // [[[x, y, t], ...], ...]
   let currentStroke = null;
   let isDrawing = false;
+  let strokeStartTime = 0;
   let lastPointTime = 0;
   const POINT_THROTTLE_MS = 15;
 
@@ -31,6 +33,7 @@
   const ctx = canvas.getContext('2d');
   const placeholder = document.getElementById('canvasPlaceholder');
   const hwStatus = document.getElementById('hwStatus');
+  const hwEngineBadge = document.getElementById('hwEngineBadge');
   const hwCandidates = document.getElementById('hwCandidates');
   const hwDetailCard = document.getElementById('hwDetailCard');
 
@@ -166,25 +169,28 @@
   }
 
   // ==========================================
-  // 6. HANZILOOKUPJS INITIALIZATION
+  // 6. HANZILOOKUPJS INITIALIZATION (Dual Engine)
   // ==========================================
   function initHanziLookup() {
-    hwStatus.textContent = '인식 엔진 초기화 중...';
-
     if (typeof HanziLookup === 'undefined') {
-      hwStatus.textContent = '인식 엔진 라이브러리를 불러올 수 없습니다.';
+      console.warn('[HanziLookup] Library not found.');
       return;
     }
 
+    // Load MMAH model
     HanziLookup.init('mmah', './data/mmah.json', (success) => {
       if (success) {
-        isModelLoaded = true;
         matcher = new HanziLookup.Matcher('mmah');
-        hwStatus.textContent = '인식 준비 완료: 캔버스에 한자를 쓰세요';
-        console.log('[HanziLookup] Model mmah initialized.');
-      } else {
-        hwStatus.textContent = '필기 인식 데이터 로드 실패';
-        console.error('[HanziLookup] Failed to initialize model.');
+        isModelLoaded = true;
+        console.log('[HanziLookup] MMAH model loaded.');
+      }
+    });
+
+    // Load ORIG model in background for dual fallback
+    HanziLookup.init('orig', './data/orig.json', (success) => {
+      if (success) {
+        origMatcher = new HanziLookup.Matcher('orig');
+        console.log('[HanziLookup] ORIG model loaded.');
       }
     });
   }
@@ -246,9 +252,12 @@
     isDrawing = true;
     placeholder.classList.add('hidden');
 
+    const now = Date.now();
+    strokeStartTime = now;
+    lastPointTime = now;
+
     const pos = getCanvasPos(e);
-    currentStroke = [pos];
-    lastPointTime = Date.now();
+    currentStroke = [[pos[0], pos[1], 0]];
 
     ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#1e293b';
     ctx.lineWidth = 6;
@@ -270,7 +279,8 @@
     const lastPos = currentStroke[currentStroke.length - 1];
     if (pos[0] === lastPos[0] && pos[1] === lastPos[1]) return;
 
-    currentStroke.push(pos);
+    const elapsed = now - strokeStartTime;
+    currentStroke.push([pos[0], pos[1], elapsed]);
     ctx.lineTo(pos[0], pos[1]);
     ctx.stroke();
     ctx.beginPath();
@@ -347,51 +357,178 @@
   }
 
   // ==========================================
-  // 8. HANDWRITING RECOGNITION MATCHING
+  // 8. HYBRID HANDWRITING RECOGNITION MATCHING
   // ==========================================
-  function runRecognition() {
-    if (!isModelLoaded || !matcher || strokes.length === 0) {
+  async function runRecognition() {
+    if (strokes.length === 0) return;
+
+    hwStatus.textContent = '유사 한자 분석 중...';
+
+    // 1. Try Google Cloud Digital Ink AI first (Superior stroke-order-free accuracy)
+    if (navigator.onLine) {
+      try {
+        const candidates = await recognizeWithGoogle(strokes);
+        if (candidates && candidates.length > 0) {
+          updateEngineBadge('✨ AI 스마트 인식', '#dbeafe', '#1e40af');
+          renderCandidates(candidates);
+          return;
+        }
+      } catch (err) {
+        console.warn('[Recognition] Cloud AI fallback to local engine:', err);
+      }
+    }
+
+    // 2. Fallback to Local Engine (HanziLookupJS with 256x256 normalization & dual models)
+    updateEngineBadge('📴 오프라인 로컬 인식', '#f1f5f9', '#475569');
+    recognizeWithLocal(strokes);
+  }
+
+  function updateEngineBadge(text, bg, color) {
+    if (hwEngineBadge) {
+      hwEngineBadge.textContent = text;
+      hwEngineBadge.style.background = bg;
+      hwEngineBadge.style.color = color;
+    }
+  }
+
+  // --- Cloud AI Engine (Google Input Tools Digital Ink) ---
+  async function recognizeWithGoogle(userStrokes) {
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.round(rect.width) || 300;
+    const height = Math.round(rect.height) || 300;
+
+    const ink = userStrokes.map(stroke => {
+      const xs = stroke.map(p => p[0]);
+      const ys = stroke.map(p => p[1]);
+      const ts = stroke.map(p => p[2] || 0);
+      return [xs, ys, ts];
+    });
+
+    const payload = {
+      app_version: 0.4,
+      api_level: "533.17.9",
+      device: "web",
+      input_type: "0",
+      options: "enable_pre_space",
+      requests: [{
+        writing_guide: { writing_area_width: width, writing_area_height: height },
+        ink: ink,
+        language: "zh-Hant" // Traditional CJK characters used in Korean Hanja
+      }]
+    };
+
+    const res = await fetch("https://inputtools.google.com/request?ime=handwriting&app=mobilesearch&cs=1&oe=UTF-8", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) throw new Error(`Google API status ${res.status}`);
+    const data = await res.json();
+    if (!data || data[0] !== "SUCCESS") throw new Error("Google API non-success");
+
+    const rawMatches = data[1][0][1] || [];
+    const candidates = [];
+    const seen = new Set();
+
+    for (let i = 0; i < rawMatches.length; i++) {
+      const str = rawMatches[i];
+      for (const ch of str) {
+        const code = ch.charCodeAt(0);
+        // Valid CJK Ideograph check
+        if ((code >= 0x4E00 && code <= 0x9FFF) || (code >= 0x3400 && code <= 0x4DBF) || (code >= 0xF900 && code <= 0xFAFF)) {
+          if (!seen.has(ch)) {
+            seen.add(ch);
+            candidates.push(ch);
+          }
+        }
+      }
+      if (candidates.length >= 15) break;
+    }
+
+    return candidates;
+  }
+
+  // --- Local Fallback Engine (HanziLookupJS) ---
+  function recognizeWithLocal(userStrokes) {
+    if (!isModelLoaded || userStrokes.length === 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = 256 / (rect.width || 256);
+    const scaleY = 256 / (rect.height || 256);
+
+    // Normalize coordinates to 256x256 coordinate system
+    const normalizedStrokes = userStrokes.map(stroke =>
+      stroke.map(p => [Math.round(p[0] * scaleX), Math.round(p[1] * scaleY)])
+    );
+
+    const analyzedChar = new HanziLookup.AnalyzedCharacter(normalizedStrokes);
+    const candidates = [];
+    const seen = new Set();
+
+    if (matcher) {
+      matcher.match(analyzedChar, 10, (matches) => {
+        if (matches) {
+          matches.forEach(m => {
+            if (!seen.has(m.character)) {
+              seen.add(m.character);
+              candidates.push(m.character);
+            }
+          });
+        }
+
+        if (origMatcher) {
+          origMatcher.match(analyzedChar, 6, (origMatches) => {
+            if (origMatches) {
+              origMatches.forEach(m => {
+                if (!seen.has(m.character)) {
+                  seen.add(m.character);
+                  candidates.push(m.character);
+                }
+              });
+            }
+            renderCandidates(candidates);
+          });
+        } else {
+          renderCandidates(candidates);
+        }
+      });
+    }
+  }
+
+  function renderCandidates(candidates) {
+    if (!candidates || candidates.length === 0) {
+      hwStatus.textContent = '일치하는 한자를 찾지 못했습니다';
+      hwCandidates.innerHTML = `<div style="color:var(--text-secondary); padding: 10px 0;">다른 획으로 다시 시도해보세요.</div>`;
       return;
     }
 
-    hwStatus.textContent = '유사 한자 인식 중...';
+    hwStatus.textContent = `추천 후보 ${candidates.length}개 (원하는 한자를 터치하세요)`;
+    hwCandidates.innerHTML = '';
 
-    // Clone strokes into expected format: array of strokes with [x, y] points
-    const strokeData = strokes.map(s => s.map(pt => [pt[0], pt[1]]));
-    const analyzedChar = new HanziLookup.AnalyzedCharacter(strokeData);
+    candidates.forEach((char, index) => {
+      const entry = charMap.get(char);
+      const hunEum = entry ? `${entry.hun || ''} ${entry.eum || ''}`.trim() : '';
 
-    // Match top 10 candidates
-    matcher.match(analyzedChar, 10, (matches) => {
-      if (!matches || matches.length === 0) {
-        hwStatus.textContent = '일치하는 한자를 찾지 못했습니다';
-        hwCandidates.innerHTML = `<div style="color:var(--text-secondary); padding: 10px 0;">다른 획으로 다시 시도해보세요.</div>`;
-        return;
-      }
+      const btn = document.createElement('button');
+      btn.className = 'hw-candidate' + (index === 0 ? ' selected' : '');
+      btn.innerHTML = `
+        <span class="hw-candidate-char">${char}</span>
+        <span class="hw-candidate-huneum">${hunEum || '한자'}</span>
+      `;
+      btn.title = hunEum ? `${char} (${hunEum})` : char;
 
-      hwStatus.textContent = `인식 후보 ${matches.length}개 (원하는 한자를 터치하세요)`;
-      hwCandidates.innerHTML = '';
-
-      matches.forEach((m, index) => {
-        const char = m.character;
-        const entry = charMap.get(char);
-
-        const btn = document.createElement('button');
-        btn.className = 'hw-candidate' + (index === 0 ? ' selected' : '');
-        btn.textContent = char;
-        btn.title = entry ? `${entry.hun || ''} ${entry.eum || ''}` : char;
-
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.hw-candidate').forEach(el => el.classList.remove('selected'));
-          btn.classList.add('selected');
-          showHanjaDetail(char);
-        });
-
-        hwCandidates.appendChild(btn);
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.hw-candidate').forEach(el => el.classList.remove('selected'));
+        btn.classList.add('selected');
+        showHanjaDetail(char);
       });
 
-      // Automatically show detail for top match
-      showHanjaDetail(matches[0].character);
+      hwCandidates.appendChild(btn);
     });
+
+    // Automatically display detail for top candidate
+    showHanjaDetail(candidates[0]);
   }
 
   function showHanjaDetail(char) {

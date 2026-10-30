@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hanja-dict-v1';
+const CACHE_NAME = 'hanja-dict-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const ASSETS = [
   './lib/hanzilookup.min.js',
   './data/hanja_dict.json',
   './data/mmah.json',
+  './data/orig.json',
   './icons/apple-touch-icon.png',
   './icons/icon-192.png',
   './icons/icon-512.png'
