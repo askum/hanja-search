@@ -68,14 +68,53 @@
   });
 
   // ==========================================
-  // 3. PWA & iOS SUPPORT
+  // 3. PWA & iOS SUPPORT (Instant Update)
   // ==========================================
   function initPWA() {
-    // Register Service Worker for offline capability
+    const updateNotice = document.getElementById('updateNotice');
+    const btnForceUpdate = document.getElementById('btnForceUpdate');
+
+    if (btnForceUpdate) {
+      btnForceUpdate.addEventListener('click', async () => {
+        btnForceUpdate.style.transform = 'rotate(360deg)';
+        showToast('🔄 최신 버전으로 갱신 중...');
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const reg of registrations) {
+            await reg.unregister();
+          }
+        }
+        window.location.reload();
+      });
+    }
+
+    if (updateNotice) {
+      updateNotice.addEventListener('click', () => {
+        window.location.reload();
+      });
+    }
+
+    // Register Service Worker with version query
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('[PWA] Service Worker registered with scope:', reg.scope))
-        .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
+      navigator.serviceWorker.register('./sw.js?v=2.1')
+        .then(reg => {
+          console.log('[PWA] Service Worker v2.1 registered.');
+          reg.onupdatefound = () => {
+            const installing = reg.installing;
+            if (installing) {
+              installing.onstatechange = () => {
+                if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                  if (updateNotice) updateNotice.classList.remove('hidden');
+                }
+              };
+            }
+          };
+        })
+        .catch(err => console.warn('[PWA] Registration failed:', err));
     }
 
     // Check if running on iOS Safari and not standalone

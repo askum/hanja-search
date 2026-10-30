@@ -1,10 +1,10 @@
-const CACHE_NAME = 'hanja-dict-v2';
+const CACHE_NAME = 'hanja-dict-v2.1';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css',
-  './js/app.js',
+  './css/style.css?v=2.1',
+  './js/app.js?v=2.1',
   './lib/hanzilookup.min.js',
   './data/hanja_dict.json',
   './data/mmah.json',
@@ -14,24 +14,25 @@ const ASSETS = [
   './icons/icon-512.png'
 ];
 
-// Install: Pre-cache core shell & data
+// Install: Skip waiting immediately
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[ServiceWorker] Pre-caching offline assets...');
+      console.log('[ServiceWorker] Caching v2.1 assets...');
       return cache.addAll(ASSETS);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
-// Activate: Clean up old caches
+// Activate: Delete all old caches and claim clients immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log('[ServiceWorker] Removing old cache:', key);
+            console.log('[ServiceWorker] Purging old cache:', key);
             return caches.delete(key);
           }
         })
